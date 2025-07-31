@@ -1,24 +1,38 @@
 import { Request, Response } from "express";
-import Trade from "../models/Trade"; // Trade 모델이 있어야 해요
+import Trade from "../models/Trade";
 
 export const getAveragePrices = async (_: Request, res: Response) => {
   try {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2시간 전
+
     const averages = await Trade.aggregate([
-      { $match: { isCompleted: true } }, // 거래 완료된 것만 선택
+      {
+        $match: {
+          isCompleted: true,
+          createdAt: { $gte: twoHoursAgo },
+          $and: [
+            { subMap: { $exists: true } },
+            { subMap: { $ne: null } },
+            { subMap: { $ne: "" } },
+          ], // subMap이 존재하고 빈 값이 아닌 것만
+        }
+      },
       {
         $group: {
-          _id: "$mapName", // 맵 이름별로 그룹화
-          averagePrice: { $avg: "$price" }, // 가격 평균 계산
-        },
+          _id: "$subMap", // 서브맵 기준 그룹화
+          averagePrice: { $avg: "$price" },
+          count: { $sum: 1 }
+        }
       },
       {
         $project: {
           _id: 0,
-          mapName: "$_id",
-          averagePrice: { $round: ["$averagePrice", 0] }, // 소수점 반올림
-        },
+          subMap: "$_id",
+          averagePrice: { $round: ["$averagePrice", 0] },
+          count: 1
+        }
       },
-      { $sort: { averagePrice: -1 } }, // 가격 높은 순 정렬 (선택)
+      { $sort: { averagePrice: -1 } } // 평균가 내림차순 정렬
     ]);
 
     res.json(averages);

@@ -36,8 +36,8 @@ app.use(express.json());
 connectDB();
 
 app.use("/trades", tradeRoutes);
-app.use("/trades", tradeRoutes);
 app.use("/party", partyRoutes);
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

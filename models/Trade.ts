@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 const TradeSchema = new mongoose.Schema({
   mapName: { type: String, required: true },
+  subMap: { type: String, required: true }, // 수정됨
   price: { type: Number, required: true },
   description: { type: String },
   isCompleted: { type: Boolean, default: false },
@@ -14,5 +15,6 @@ const TradeSchema = new mongoose.Schema({
   userId: { type: String, required: true }, // 디스코드 사용자 ID
   createdAt: { type: Date, default: Date.now },
 });
+
 
 export default mongoose.model("Trade", TradeSchema);
