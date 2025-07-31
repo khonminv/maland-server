@@ -66,7 +66,7 @@ router.post("/", async (req, res) => {
     subMap,
     price: priceNum,
     description,
-    userId,
+    // userId,
     status: "대기중", // 초기 상태
     isCompleted: false,
   });
