@@ -52,9 +52,9 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   const { mapName, subMap, price, description, userId } = req.body;
 
-  if (!mapName || !subMap || userId == null || price == null) {
-    return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
-  }
+  // if (!mapName || !subMap || userId == null || price == null) {
+  //   return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
+  // }
 
   const priceNum = Number(price);
   if (isNaN(priceNum)) {
