@@ -50,30 +50,36 @@ router.get("/", async (req, res) => {
 
 // ✅ 거래 등록
 router.post("/", async (req, res) => {
-  const { mapName, subMap, price, description, userId } = req.body;
+  try {
+    const { mapName, subMap, price, description, userId } = req.body;
 
-  // if (!mapName || !subMap || userId == null || price == null) {
-  //   return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
-  // }
+    if (!mapName || !subMap || userId == null || price == null) {
+      return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
+    }
 
-  const priceNum = Number(price);
-  if (isNaN(priceNum)) {
-    return res.status(400).json({ error: "가격이 숫자가 아닙니다." });
+    const priceNum = Number(price);
+    if (isNaN(priceNum)) {
+      return res.status(400).json({ error: "가격이 숫자가 아닙니다." });
+    }
+
+    const newTrade = new Trade({
+      mapName,
+      subMap,
+      price: priceNum,
+      description,
+      userId,
+      status: "대기중",
+      isCompleted: false,
+    });
+
+    await newTrade.save();
+    res.status(201).json(newTrade);
+  } catch (error) {
+    console.error("POST /trades 에러:", error);
+    res.status(500).json({ error: "서버 오류" });
   }
-
-  const newTrade = new Trade({
-    mapName,
-    subMap,
-    price: priceNum,
-    description,
-    // userId,
-    status: "대기중", // 초기 상태
-    isCompleted: false,
-  });
-
-  await newTrade.save();
-  res.status(201).json(newTrade);
 });
+
 
 // ✅ 거래 상태 변경 (거래 완료 포함)
 router.patch("/:id/status", async (req, res) => {
