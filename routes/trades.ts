@@ -51,7 +51,7 @@ router.get("/", async (req, res) => {
 // ✅ 거래 등록
 router.post("/", async (req, res) => {
   try {
-    const { mapName, subMap, type, price, description, userId } = req.body;
+    const { mapName, subMap, type, price, description, userId ,username, avatar } = req.body;
 
     if (!mapName || !subMap || !type || userId == null || price == null) {
       return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
@@ -73,6 +73,8 @@ router.post("/", async (req, res) => {
       price: priceNum,
       description: description || "",
       userId,
+      username,
+      avatar,
       status: "거래가능",
       isCompleted: false,
     });

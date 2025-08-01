@@ -14,6 +14,8 @@ const TradeSchema = new mongoose.Schema({
     default: "거래가능",
   },
   userId: { type: String, required: true }, // 디스코드 사용자 ID
+  username: {String},
+  avatar: {String},
   createdAt: { type: Date, default: Date.now },
 });
 
