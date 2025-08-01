@@ -51,6 +51,7 @@ router.get("/", async (req, res) => {
 // ✅ 거래 등록
 router.post("/", async (req, res) => {
   try {
+    console.log("req.body:", req.body);
     const { mapName, subMap, price, description, userId } = req.body;
 
     if (!mapName || !subMap || userId == null || price == null) {
