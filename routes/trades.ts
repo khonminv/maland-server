@@ -52,6 +52,7 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     console.log("req.body:", req.body);
+
     const { mapName, subMap, price, description, userId } = req.body;
 
     if (!mapName || !subMap || userId == null || price == null) {
@@ -67,19 +68,23 @@ router.post("/", async (req, res) => {
       mapName,
       subMap,
       price: priceNum,
-      description,
+      description: description || "",  // undefined 방지용
       userId,
       status: "대기중",
       isCompleted: false,
     });
 
+    console.log("저장 전 newTrade 객체:", newTrade);
+
     await newTrade.save();
+
     res.status(201).json(newTrade);
   } catch (error) {
     console.error("POST /trades 에러:", error);
     res.status(500).json({ error: "서버 오류" });
   }
 });
+
 
 
 // ✅ 거래 상태 변경 (거래 완료 포함)
