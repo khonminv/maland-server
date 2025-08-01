@@ -43,7 +43,7 @@ router.get("/discord/callback", async (req, res) => {
     console.log("디스코드 유저 정보:", user);
 
     // 프론트로 리디렉션 + 유저 정보 전달
-    res.redirect(`http://localhost:3000/auth/success?username=${encodeURIComponent(user.username)}`);
+    res.redirect(`http://localhost:3000/?username=${encodeURIComponent(user.username)}`);
   } catch (err: any) {
     console.error("디스코드 로그인 실패", err.response?.data || err.message || err);
     res.status(500).send("로그인 실패");
