@@ -51,12 +51,14 @@ router.get("/", async (req, res) => {
 // ✅ 거래 등록
 router.post("/", async (req, res) => {
   try {
-    console.log("req.body:", req.body);
+    const { mapName, subMap, type, price, description, userId } = req.body;
 
-    const { mapName, subMap, price, description, userId } = req.body;
-
-    if (!mapName || !subMap || userId == null || price == null) {
+    if (!mapName || !subMap || !type || userId == null || price == null) {
       return res.status(400).json({ error: "필수 항목이 빠졌습니다." });
+    }
+
+    if (!["삽니다", "팝니다"].includes(type)) {
+      return res.status(400).json({ error: "type 값이 올바르지 않습니다." });
     }
 
     const priceNum = Number(price);
@@ -67,23 +69,23 @@ router.post("/", async (req, res) => {
     const newTrade = new Trade({
       mapName,
       subMap,
+      type,
       price: priceNum,
-      description: description || "",  // undefined 방지용
+      description: description || "",
       userId,
-      status: "대기중",
+      status: "거래가능",
       isCompleted: false,
     });
-
-    console.log("저장 전 newTrade 객체:", newTrade);
 
     await newTrade.save();
 
     res.status(201).json(newTrade);
   } catch (error) {
-    console.error("POST /trades 에러:", error);
+    console.error(error);
     res.status(500).json({ error: "서버 오류" });
   }
 });
+
 
 
 
