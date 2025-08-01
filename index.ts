@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db";
 import partyRoutes from "./routes/party";
 import tradeRoutes from "./routes/trades";
+import authRouter from "./routes/auth";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ connectDB();
 
 app.use("/trades", tradeRoutes);
 app.use("/party", partyRoutes);
+app.use("/auth", authRouter);
 
 
 app.listen(PORT, () => {

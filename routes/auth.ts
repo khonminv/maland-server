@@ -1,0 +1,52 @@
+// routes/auth.ts
+import express from "express";
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const router = express.Router();
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET!;
+const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI!;
+
+// 1. 로그인 시작 (프론트에서 직접 Discord 로그인 URL로 이동)
+router.get("/discord/callback", async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) return res.status(400).send("코드 없음");
+
+  try {
+    // 2. 코드로 access_token 받기
+    const tokenRes = await axios.post(
+      "https://discord.com/api/oauth2/token",
+      new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token } = tokenRes.data;
+
+    // 3. 사용자 정보 받아오기
+    const userRes = await axios.get("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    const user = userRes.data;
+    // 여기서 세션 저장, 토큰 발급 등 처리 가능
+    console.log("디스코드 유저:", user);
+
+    // 프론트로 리디렉션 + 유저 정보 전달
+    res.redirect(`http://localhost:3000/auth/success?username=${user.username}`);
+  } catch (err) {
+    console.error("디스코드 로그인 실패", err);
+    res.status(500).send("로그인 실패");
+  }
+});
+
+export default router;
