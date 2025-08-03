@@ -9,13 +9,14 @@ const TradeSchema = new mongoose.Schema({
   isCompleted: { type: Boolean, default: false },
   status: {
     type: String,
-    enum: ["거래가능", "예약중", "거래완료", "대기중"],
+    enum: ["거래가능", "예약중", "거래완료", "거래중"],
     default: "거래가능",
   },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   username: { type: String },
   avatar: { type: String },
   createdAt: { type: Date, default: Date.now },
+  reservedBy: { type: String, default: null }
 });
 
 export default mongoose.model("Trade", TradeSchema);

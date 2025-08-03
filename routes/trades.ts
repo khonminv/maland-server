@@ -151,4 +151,41 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// ✅ 거래 신청 (1인 1건)
+router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "인증되지 않은 사용자입니다." });
+    }
+    const tradeId = req.params.id;
+
+    // 나머지 로직 동일
+    const existingReservation = await Trade.findOne({
+      reservedBy: user.id,
+      status: "거래중",
+    });
+
+    if (existingReservation) {
+      return res.status(400).json({ error: "이미 예약한 거래가 있습니다." });
+    }
+
+    const trade = await Trade.findById(tradeId);
+    if (!trade || trade.status !== "거래가능") {
+      return res.status(400).json({ error: "이 거래는 신청할 수 없습니다." });
+    }
+
+    trade.status = "거래중";
+    trade.reservedBy = user.id;
+    await trade.save();
+
+    res.json(trade);
+  } catch (error) {
+    console.error("[ERROR] 거래 신청 실패:", error);
+    res.status(500).json({ error: "서버 오류" });
+  }
+});
+
+
+
 export default router;
