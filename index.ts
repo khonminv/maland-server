@@ -1,4 +1,3 @@
-// index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,37 +9,33 @@ import authRouter from "./routes/auth";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
-const allowedOrigins = process.env.NODE_ENV === "production"
-  ? [process.env.FRONTEND_URL || "https://your-production-frontend.com"]
-  : ["http://localhost:3000"]; // 개발용 프론트 주소
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin) {
-      // Postman, 서버에서 직접 요청하는 경우도 허용
-      return callback(null, true);
-    }
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  optionsSuccessStatus: 200,
-};
+// Express 앱의 CORS도 허용
+app.use(cors({
+    origin: allowedOrigin,
+    credentials: true  // 이 줄을 추가!
+}));
 
-app.use(cors(corsOptions));
+// ✅ JSON 파싱 먼저
 app.use(express.json());
+
+// ✅ 로그 찍기
+app.use((req, res, next) => {
+  console.log(`[${req.method}] ${req.originalUrl} - Origin: ${req.headers.origin}`);
+  next();
+});
 
 connectDB();
 
+// ✅ 라우트 연결
 app.use("/trades", tradeRoutes);
 app.use("/party", partyRoutes);
 app.use("/auth", authRouter);
 
-
+// ✅ 서버 시작
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
