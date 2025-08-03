@@ -72,9 +72,6 @@ router.post("/", async (req, res) => {
       type,
       price: priceNum,
       description: description || "",
-      userId,
-      username,
-      avatar,
       status: "거래가능",
       isCompleted: false,
     });
