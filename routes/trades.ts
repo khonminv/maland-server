@@ -45,8 +45,24 @@ router.get("/", async (req, res) => {
     if (status) query.status = status;
     if (search) query.mapName = { $regex: search, $options: "i" };
 
-    const trades = await Trade.find(query).sort({ createdAt: -1 });
-    res.json(trades);
+    // userId 필드 populate해서 username, avatar, discordId 가져오기
+    const trades = await Trade.find(query)
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "userId",
+        select: "username avatar discordId",
+      });
+
+    // userId 필드를 author로 변경
+    const tradesWithAuthor = trades.map((trade) => {
+      const tradeObj = trade.toObject() as any; // 여기서 any로 단언
+      tradeObj.author = tradeObj.userId;
+      delete tradeObj.userId;
+      return tradeObj;
+    });
+
+
+    res.json(tradesWithAuthor);
   } catch (error) {
     console.error("[ERROR] 거래 목록 조회 실패:", error);
     res.status(500).json({ error: "서버 오류" });
