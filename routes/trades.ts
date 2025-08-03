@@ -36,7 +36,7 @@ router.get("/average-prices-by-submap", async (req, res) => {
   }
 });
 
-// ✅ 거래 전체 목록 조회
+/// ✅ 거래 전체 목록 조회
 router.get("/", async (req, res) => {
   try {
     const { status, search } = req.query;
@@ -45,22 +45,21 @@ router.get("/", async (req, res) => {
     if (status) query.status = status;
     if (search) query.mapName = { $regex: search, $options: "i" };
 
-    // userId 필드 populate해서 username, avatar, discordId 가져오기
-    const trades = await Trade.find(query)
-      .sort({ createdAt: -1 })
-      .populate({
-        path: "userId",
-        select: "username avatar discordId",
-      });
+    const trades = await Trade.find(query).sort({ createdAt: -1 });
 
-    // userId 필드를 author로 변경
+    // userId, username, avatar 직접 넣은 걸 가공해서 author 필드 생성
     const tradesWithAuthor = trades.map((trade) => {
-      const tradeObj = trade.toObject() as any; // 여기서 any로 단언
-      tradeObj.author = tradeObj.userId;
+      const tradeObj = trade.toObject() as any;
+      tradeObj.author = {
+        username: tradeObj.username,
+        avatar: tradeObj.avatar,
+        discordId: tradeObj.userId,
+      };
+      delete tradeObj.username;
+      delete tradeObj.avatar;
       delete tradeObj.userId;
       return tradeObj;
     });
-
 
     res.json(tradesWithAuthor);
   } catch (error) {
@@ -68,6 +67,7 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "서버 오류" });
   }
 });
+
 
 // ✅ 거래 등록 (인증 필요)
 router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
