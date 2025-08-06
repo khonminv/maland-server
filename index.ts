@@ -5,6 +5,7 @@ import { connectDB } from "./config/db";
 import partyRoutes from "./routes/party";
 import tradeRoutes from "./routes/trades";
 import authRouter from "./routes/auth";
+import myRouter from "./routes/my"
 
 dotenv.config();
 
@@ -22,11 +23,6 @@ app.use(cors({
 // ✅ JSON 파싱 먼저
 app.use(express.json());
 
-// ✅ 로그 찍기
-app.use((req, res, next) => {
-  console.log(`[${req.method}] ${req.originalUrl} - Origin: ${req.headers.origin}`);
-  next();
-});
 
 connectDB();
 
@@ -34,6 +30,7 @@ connectDB();
 app.use("/trades", tradeRoutes);
 app.use("/party", partyRoutes);
 app.use("/auth", authRouter);
+app.use("/my", myRouter);
 
 // ✅ 서버 시작
 app.listen(PORT, () => {

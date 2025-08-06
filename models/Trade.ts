@@ -1,6 +1,21 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Types, Document } from "mongoose";
 
-const TradeSchema = new mongoose.Schema({
+export interface ITrade extends Document {
+  type: "삽니다" | "팝니다";
+  mapName: string;
+  subMap: string;
+  price: number;
+  description?: string;
+  isCompleted: boolean;
+  status: "거래가능" | "예약중" | "거래완료" | "거래중";
+  userId: Types.ObjectId;
+  username?: string;
+  avatar?: string;
+  createdAt: Date;
+  reservedBy?: Types.ObjectId | null;
+}
+
+const TradeSchema = new Schema<ITrade>({
   type: { type: String, enum: ["삽니다", "팝니다"], required: true },
   mapName: { type: String, required: true },
   subMap: { type: String, required: true },
@@ -16,7 +31,7 @@ const TradeSchema = new mongoose.Schema({
   username: { type: String },
   avatar: { type: String },
   createdAt: { type: Date, default: Date.now },
-  reservedBy: { type: String, default: null }
+  reservedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
 });
 
-export default mongoose.model("Trade", TradeSchema);
+export default mongoose.model<ITrade>("Trade", TradeSchema);

@@ -1,13 +1,17 @@
 import express from "express";
+import mongoose, { Types } from "mongoose";
 import Trade from "../models/Trade";
-import { getAveragePrices } from "../controllers/tradeController";
 import { authMiddleware, AuthenticatedRequest } from "../middlewares/auth";
 
 const router = express.Router();
 
+interface QueryParams {
+  status?: string;
+  search?: string;
+}
+
 // ✅ 평균 가격 조회 (최근 2시간, 거래완료만)
 router.get("/average-prices-by-submap", async (req, res) => {
-  console.log("[LOG] GET /trades/average-prices-by-submap");
   try {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
@@ -36,25 +40,29 @@ router.get("/average-prices-by-submap", async (req, res) => {
   }
 });
 
-/// ✅ 거래 전체 목록 조회
 router.get("/", async (req, res) => {
   try {
-    const { status, search } = req.query;
+    const { status, search } = req.query as QueryParams;
 
-    const query: any = {};
+    const query: Record<string, any> = {};
     if (status) query.status = status;
     if (search) query.mapName = { $regex: search, $options: "i" };
 
-    const trades = await Trade.find(query).sort({ createdAt: -1 });
+    // reservedBy를 User 컬렉션에서 필요한 필드만 가져오도록 populate
+    const trades = await Trade.find(query)
+      .populate({ path: "reservedBy", select: "discordId username avatar" })
+      .sort({ createdAt: -1 });
 
-    // userId, username, avatar 직접 넣은 걸 가공해서 author 필드 생성
     const tradesWithAuthor = trades.map((trade) => {
       const tradeObj = trade.toObject() as any;
       tradeObj.author = {
         username: tradeObj.username,
         avatar: tradeObj.avatar,
-        discordId: tradeObj.userId,
+        discordId: tradeObj.userId?.toString(),
       };
+      // reservedBy도 객체 형태로 포함됨 (populate 덕분에)
+      // 필요에 따라 reservedBy 필드 정리 가능
+
       delete tradeObj.username;
       delete tradeObj.avatar;
       delete tradeObj.userId;
@@ -69,13 +77,12 @@ router.get("/", async (req, res) => {
 });
 
 
-// ✅ 거래 등록 (인증 필요)
+// 거래 등록 (인증 필요)
 router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { mapName, subMap, type, price, description } = req.body;
     const user = req.user;
 
-    // 필수 항목 확인
     if (!mapName || !subMap || !type || price === undefined || !user) {
       return res.status(400).json({ error: "필수 항목이 누락되었습니다." });
     }
@@ -97,7 +104,7 @@ router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
       description: description || "",
       status: "거래가능",
       isCompleted: false,
-      userId: user.id,
+      userId: new Types.ObjectId(user.id),
       username: user.username,
       avatar: user.avatar,
     });
@@ -110,10 +117,13 @@ router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// ✅ 거래 상태 변경
+// 거래 상태 변경
 router.patch("/:id/status", async (req, res) => {
   try {
     const { status } = req.body;
+    if (!["거래가능", "예약중", "거래완료", "거래중"].includes(status)) {
+      return res.status(400).json({ error: "유효하지 않은 상태값입니다." });
+    }
 
     const trade = await Trade.findByIdAndUpdate(
       req.params.id,
@@ -135,7 +145,43 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-// ✅ 거래 삭제
+// 거래 예약 취소 (예약자 본인만 가능)
+router.post("/:id/cancel-reserve", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "인증되지 않은 사용자입니다." });
+    }
+
+    const tradeId = req.params.id;
+
+    const trade = await Trade.findById(tradeId);
+
+    if (!trade) {
+      return res.status(404).json({ error: "해당 거래를 찾을 수 없습니다." });
+    }
+
+    if (!trade.reservedBy || trade.reservedBy.toString() !== user.id) {
+      return res.status(403).json({ error: "본인의 예약만 취소할 수 있습니다." });
+    }
+
+    if (trade.status !== "거래중") {
+      return res.status(400).json({ error: "예약된 거래가 아닙니다." });
+    }
+
+    trade.status = "거래가능";
+    trade.reservedBy = null; // null 허용 타입이어야 합니다.
+
+    await trade.save();
+
+    res.json({ message: "예약이 취소되었습니다.", trade });
+  } catch (error) {
+    console.error("[ERROR] 거래 예약 취소 실패:", error);
+    res.status(500).json({ error: "서버 오류" });
+  }
+});
+
+// 거래 삭제
 router.delete("/:id", async (req, res) => {
   try {
     const deleted = await Trade.findByIdAndDelete(req.params.id);
@@ -151,7 +197,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// ✅ 거래 신청 (1인 1건)
+// 거래 신청 (1인 1건)
 router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.user;
@@ -160,9 +206,8 @@ router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, re
     }
     const tradeId = req.params.id;
 
-    // 나머지 로직 동일
     const existingReservation = await Trade.findOne({
-      reservedBy: user.id,
+      reservedBy: new Types.ObjectId(user.id),
       status: "거래중",
     });
 
@@ -176,7 +221,7 @@ router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, re
     }
 
     trade.status = "거래중";
-    trade.reservedBy = user.id;
+    trade.reservedBy = new Types.ObjectId(user.id);
     await trade.save();
 
     res.json(trade);
@@ -185,7 +230,5 @@ router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, re
     res.status(500).json({ error: "서버 오류" });
   }
 });
-
-
 
 export default router;

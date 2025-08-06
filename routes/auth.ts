@@ -80,6 +80,7 @@ router.get("/discord/callback", async (req, res) => {
       { expiresIn: "7d" }
     );
 
+
     // 5. 프론트로 리디렉션 (토큰 포함)
     res.redirect(`${FRONTEND_URL}/?token=${token}`);
   } catch (err: any) {
