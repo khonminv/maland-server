@@ -25,7 +25,7 @@ const TradeSchema = new Schema<ITrade>({
   status: {
     type: String,
     enum: ["거래가능", "예약중", "거래완료", "거래중"],
-    default: "거래가능",
+    default: "거래중",
   },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   username: { type: String },
