@@ -29,6 +29,7 @@ export const authMiddleware = (
   }
 
   const token = authHeader.split(" ")[1];
+   console.log("[JWT] 받은 토큰:", token);
 
   try {
     const decoded = jwt.verify(token, secret) as {
