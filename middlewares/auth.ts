@@ -12,6 +12,7 @@ export interface AuthenticatedRequest extends Request {
     id: string;
     username: string;
     avatar?: string;
+    discordId?: string;
   };
 }
 
@@ -34,6 +35,7 @@ export const authMiddleware = (
       id: string;
       username: string;
       avatar?: string;
+      discordId?: string;
     };
 
     req.user = decoded;

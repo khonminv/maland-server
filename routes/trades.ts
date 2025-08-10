@@ -10,7 +10,7 @@ interface QueryParams {
   search?: string;
 }
 
-// ✅ 평균 가격 조회 (최근 2시간, 거래완료만)
+// 평균 가격 조회 시 completedAt 기준 필터링
 router.get("/average-prices-by-submap", async (req, res) => {
   try {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -19,7 +19,7 @@ router.get("/average-prices-by-submap", async (req, res) => {
       {
         $match: {
           isCompleted: true,
-          createdAt: { $gte: twoHoursAgo },
+          completedAt: { $gte: twoHoursAgo }, // 완료 시점 기준으로 필터링
           subMap: { $exists: true, $ne: "" },
         },
       },
@@ -40,6 +40,7 @@ router.get("/average-prices-by-submap", async (req, res) => {
   }
 });
 
+
 router.get("/", async (req, res) => {
   try {
     const { status, search } = req.query as QueryParams;
@@ -50,26 +51,24 @@ router.get("/", async (req, res) => {
 
     // reservedBy를 User 컬렉션에서 필요한 필드만 가져오도록 populate
     const trades = await Trade.find(query)
-      .populate({ path: "reservedBy", select: "discordId username avatar" })
-      .sort({ createdAt: -1 });
+  .populate({ path: "reservedBy", select: "discordId username avatar" })
+  .populate({ path: "userId", select: "discordId username avatar" }) // ← 작성자 정보 불러오기
+  .sort({ createdAt: -1 });
 
-    const tradesWithAuthor = trades.map((trade) => {
-      const tradeObj = trade.toObject() as any;
-      tradeObj.author = {
-        username: tradeObj.username,
-        avatar: tradeObj.avatar,
-        discordId: tradeObj.userId?.toString(),
-      };
-      // reservedBy도 객체 형태로 포함됨 (populate 덕분에)
-      // 필요에 따라 reservedBy 필드 정리 가능
+const tradesWithAuthor = trades.map((trade) => {
+  const tradeObj = trade.toObject() as any;
+  tradeObj.author = {
+    username: tradeObj.userId?.username,
+    avatar: tradeObj.userId?.avatar,
+    discordId: tradeObj.userId?.discordId, // ← 여기서 Discord ID 사용
+  };
 
-      delete tradeObj.username;
-      delete tradeObj.avatar;
-      delete tradeObj.userId;
-      return tradeObj;
-    });
+  delete tradeObj.userId; // 원본 ObjectId 필드 제거
+  return tradeObj;
+});
 
-    res.json(tradesWithAuthor);
+res.json(tradesWithAuthor);
+
   } catch (error) {
     console.error("[ERROR] 거래 목록 조회 실패:", error);
     res.status(500).json({ error: "서버 오류" });
@@ -119,30 +118,24 @@ router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
 
 // 거래 상태 변경
 router.patch("/:id/status", async (req, res) => {
-  try {
-    const { status } = req.body;
-    if (!["거래가능", "예약중", "거래완료", "거래중"].includes(status)) {
-      return res.status(400).json({ error: "유효하지 않은 상태값입니다." });
-    }
-
-    const trade = await Trade.findByIdAndUpdate(
-      req.params.id,
-      {
-        status,
-        isCompleted: status === "거래완료",
-      },
-      { new: true }
-    );
-
-    if (!trade) {
-      return res.status(404).json({ error: "해당 거래를 찾을 수 없습니다." });
-    }
-
-    res.json(trade);
-  } catch (error) {
-    console.error("[ERROR] 거래 상태 변경 실패:", error);
-    res.status(500).json({ error: "서버 오류" });
+  const { status } = req.body;
+  if (!["거래가능", "예약중", "거래완료", "거래중"].includes(status)) {
+    return res.status(400).json({ error: "유효하지 않은 상태값입니다." });
   }
+
+  const updateData: any = { status };
+  if (status === "거래완료") {
+    updateData.isCompleted = true;
+    updateData.completedAt = new Date(); // 완료 시점 기록
+  } else {
+    updateData.isCompleted = false;
+    updateData.completedAt = null;
+  }
+
+  const trade = await Trade.findByIdAndUpdate(req.params.id, updateData, { new: true });
+  if (!trade) return res.status(404).json({ error: "해당 거래를 찾을 수 없습니다." });
+
+  res.json(trade);
 });
 
 // 거래 예약 취소 (예약자 본인만 가능)

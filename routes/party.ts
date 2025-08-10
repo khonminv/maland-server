@@ -5,7 +5,7 @@ import { authMiddleware, AuthenticatedRequest } from "../middlewares/auth";
 const router = express.Router();
 
 // 전체 파티 목록 조회
-router.get("/", async (req, res) => {
+router.get("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { map, subMap, position } = req.query;
     let filter: any = {};
@@ -14,22 +14,41 @@ router.get("/", async (req, res) => {
     if (position) filter.positions = position;
 
     const now = new Date();
-    const parties = await Party.find(filter).sort({ createdAt: -1 });
+    const parties = await Party.find(filter).sort({ createdAt: -1 }).lean();
 
-    // 2시간 지난 파티 자동 마감
-    for (const party of parties) {
-      if (!party.isClosed && (now.getTime() - new Date(party.createdAt).getTime()) > 2 * 60 * 60 * 1000) {
-        party.isClosed = true;
-        await party.save();
-      }
+    const user = req.user as { id: string; username: string; avatar?: string; discordId?: string };
+
+const userDiscordId = user?.discordId;
+
+
+    const updatedParties = await Promise.all(
+  parties.map(async (party) => {
+    if (!party.isClosed && (now.getTime() - new Date(party.createdAt).getTime()) > 2 * 60 * 60 * 1000) {
+      await Party.findByIdAndUpdate(party._id, { isClosed: true });
+      party.isClosed = true;
     }
 
-    res.json(parties);
+    const isApplied =
+      party.applicants?.some(
+        (a: any) =>
+          String(a.discordId).trim() === String(userDiscordId).trim()
+      ) || false;
+
+
+    return {
+      ...party,
+      isApplied,
+    };
+  })
+);
+
+
+    res.json(updatedParties);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "서버 오류" });
   }
 });
-
 
 // 파티 모집글 등록
 router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -85,9 +104,9 @@ router.post("/:id/apply", authMiddleware, async (req: AuthenticatedRequest, res)
       level,
       appliedAt: new Date(),
       message: message || "",
-      positions, 
+      positions,
     });
-    
+
     await party.save();
 
     res.json({ message: "신청 완료", party });
@@ -96,7 +115,6 @@ router.post("/:id/apply", authMiddleware, async (req: AuthenticatedRequest, res)
   }
 });
 
-
 // 신청자 목록 조회
 router.get("/:id/applicants", async (req, res) => {
   try {
@@ -104,12 +122,10 @@ router.get("/:id/applicants", async (req, res) => {
     if (!party) return res.status(404).json({ message: "파티를 찾을 수 없습니다." });
 
     res.json({ applicants: party.applicants || [] });
-
   } catch (err) {
     res.status(500).json({ message: "서버 오류" });
   }
 });
-
 
 // 모집 마감 예시
 router.patch("/:id/close", async (req, res) => {

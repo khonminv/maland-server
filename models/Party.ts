@@ -4,7 +4,7 @@ const PartySchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   map: { type: String, required: true },
   subMap: { type: String, required: true },
-  positions: [{ type: String, required: true }],
+  positions: [{ type: String, required: true }], // 모집 자리 목록
   content: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   isClosed: { type: Boolean, default: false },
@@ -17,10 +17,11 @@ const PartySchema = new mongoose.Schema({
       level: { type: Number },
       appliedAt: { type: Date, default: Date.now },
       message: { type: String, default: "" },
-      positions: [{ type: String, required: true }], // ✅ 이 부분 추가!
+      positions: [{ type: String, required: true }], // 신청자가 선택한 자리
     },
   ],
 });
+
 
 
 const Party = mongoose.models.Party || mongoose.model("Party", PartySchema);

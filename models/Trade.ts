@@ -12,6 +12,7 @@ export interface ITrade extends Document {
   username?: string;
   avatar?: string;
   createdAt: Date;
+  completedAt: Date;
   reservedBy?: Types.ObjectId | null;
 }
 
@@ -22,6 +23,7 @@ const TradeSchema = new Schema<ITrade>({
   price: { type: Number, required: true },
   description: { type: String },
   isCompleted: { type: Boolean, default: false },
+  completedAt: { type: Date, default: Date.now },
   status: {
     type: String,
     enum: ["거래가능", "예약중", "거래완료", "거래중"],
