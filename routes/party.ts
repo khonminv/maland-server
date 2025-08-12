@@ -51,6 +51,37 @@ router.get("/", authOptional, async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// 모집글 등록 (생성)
+router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { map, subMap, positions, content } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "인증 필요" });
+    }
+    if (!map || !subMap || !Array.isArray(positions) || positions.length === 0 || !content?.trim()) {
+      return res.status(400).json({ message: "필수 항목 누락" });
+    }
+
+    const newParty = new Party({
+      userId,
+      map,
+      subMap,
+      positions,
+      content,
+      // createdAt은 스키마 default 사용
+    });
+
+    await newParty.save();
+    res.status(201).json(newParty);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "서버 오류" });
+  }
+});
+
+
 
 // 파티 신청
 router.post("/:id/apply", authMiddleware, async (req: AuthenticatedRequest, res) => {
