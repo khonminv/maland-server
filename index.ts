@@ -6,6 +6,7 @@ import partyRoutes from "./routes/party";
 import tradeRoutes from "./routes/trades";
 import authRouter from "./routes/auth";
 import myRouter from "./routes/my"
+import noticeRouter from "./routes/notice";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use("/trades", tradeRoutes);
 app.use("/party", partyRoutes);
 app.use("/auth", authRouter);
 app.use("/my", myRouter);
+app.use("/notice", noticeRouter);
 
 // ✅ 서버 시작
 app.listen(PORT, () => {

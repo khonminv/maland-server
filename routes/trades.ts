@@ -40,7 +40,6 @@ router.get("/average-prices-by-submap", async (req, res) => {
   }
 });
 
-
 router.get("/", async (req, res) => {
   try {
     const { status, search } = req.query as QueryParams;
@@ -51,30 +50,28 @@ router.get("/", async (req, res) => {
 
     // reservedBy를 User 컬렉션에서 필요한 필드만 가져오도록 populate
     const trades = await Trade.find(query)
-  .populate({ path: "reservedBy", select: "discordId username avatar" })
-  .populate({ path: "userId", select: "discordId username avatar" }) // ← 작성자 정보 불러오기
-  .sort({ createdAt: -1 });
+      .populate({ path: "reservedBy", select: "discordId username avatar" })
+      .populate({ path: "userId", select: "discordId username avatar" }) // ← 작성자 정보 불러오기
+      .sort({ createdAt: -1 });
 
-const tradesWithAuthor = trades.map((trade) => {
-  const tradeObj = trade.toObject() as any;
-  tradeObj.author = {
-    username: tradeObj.userId?.username,
-    avatar: tradeObj.userId?.avatar,
-    discordId: tradeObj.userId?.discordId, // ← 여기서 Discord ID 사용
-  };
+    const tradesWithAuthor = trades.map((trade) => {
+      const tradeObj = trade.toObject() as any;
+      tradeObj.author = {
+        username: tradeObj.userId?.username,
+        avatar: tradeObj.userId?.avatar,
+        discordId: tradeObj.userId?.discordId, // ← 여기서 Discord ID 사용
+      };
 
-  delete tradeObj.userId; // 원본 ObjectId 필드 제거
-  return tradeObj;
-});
+      delete tradeObj.userId; // 원본 ObjectId 필드 제거
+      return tradeObj;
+    });
 
-res.json(tradesWithAuthor);
-
+    res.json(tradesWithAuthor);
   } catch (error) {
     console.error("[ERROR] 거래 목록 조회 실패:", error);
     res.status(500).json({ error: "서버 오류" });
   }
 });
-
 
 // 거래 등록 (인증 필요)
 router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -119,7 +116,7 @@ router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
 // 거래 상태 변경
 router.patch("/:id/status", async (req, res) => {
   const { status } = req.body;
-  if (!["거래가능", "예약중", "거래완료", "거래중"].includes(status)) {
+  if (!["거래가능", "거래취소", "거래완료", "거래중"].includes(status)) {
     return res.status(400).json({ error: "유효하지 않은 상태값입니다." });
   }
 
@@ -147,7 +144,6 @@ router.post("/:id/cancel-reserve", authMiddleware, async (req: AuthenticatedRequ
     }
 
     const tradeId = req.params.id;
-
     const trade = await Trade.findById(tradeId);
 
     if (!trade) {
@@ -164,7 +160,6 @@ router.post("/:id/cancel-reserve", authMiddleware, async (req: AuthenticatedRequ
 
     trade.status = "거래가능";
     trade.reservedBy = null; // null 허용 타입이어야 합니다.
-
     await trade.save();
 
     res.json({ message: "예약이 취소되었습니다.", trade });
@@ -223,5 +218,44 @@ router.post("/:id/reserve", authMiddleware, async (req: AuthenticatedRequest, re
     res.status(500).json({ error: "서버 오류" });
   }
 });
+
+/** ============================
+ *  자동 거래취소 스케줄러 (24시간 경과)
+ *  - 상태: 거래가능/거래중 → 거래취소
+ *  - 부가 정리: reservedBy=null, isCompleted=false, completedAt=null
+ *  - 10분마다 실행 + 서버 기동 시 1회 즉시 실행
+ * ============================ */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+async function cancelExpiredTrades() {
+  const threshold = new Date(Date.now() - ONE_DAY_MS);
+  try {
+    const result = await Trade.updateMany(
+      {
+        createdAt: { $lt: threshold },
+        status: { $in: ["거래가능", "거래중"] },
+      },
+      {
+        $set: {
+          status: "거래취소",
+          isCompleted: false,
+          completedAt: null,
+          reservedBy: null,
+        },
+      }
+    );
+
+    if ((result as any).modifiedCount) {
+      console.log(`[AUTO] ${ (result as any).modifiedCount }건 자동 거래취소 완료`);
+    }
+  } catch (err) {
+    console.error("[AUTO] 자동 거래취소 실패:", err);
+  }
+}
+
+// 서버 시작 시 즉시 1회 실행
+cancelExpiredTrades();
+// 이후 10분마다 반복 실행
+setInterval(cancelExpiredTrades, 10 * 60 * 1000);
 
 export default router;
