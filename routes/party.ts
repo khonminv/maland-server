@@ -1,47 +1,48 @@
 import express from "express";
 import Party from "../models/Party";
-import { authMiddleware, AuthenticatedRequest } from "../middlewares/auth";
+import { authMiddleware, authOptional, AuthenticatedRequest } from "../middlewares/auth";
 
 const router = express.Router();
 
+
 // 전체 파티 목록 조회
-router.get("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
+router.get("/", authOptional, async (req: AuthenticatedRequest, res) => {
   try {
-    const { map, subMap, position } = req.query;
-    let filter: any = {};
+    const { map, subMap, position } = req.query as {
+      map?: string; subMap?: string; position?: string;
+    };
+
+    const filter: any = {};
     if (map) filter.map = map;
     if (subMap) filter.subMap = subMap;
     if (position) filter.positions = position;
 
-    const now = new Date();
+    const now = Date.now();
     const parties = await Party.find(filter).sort({ createdAt: -1 }).lean();
 
-    const user = req.user as { id: string; username: string; avatar?: string; discordId?: string };
-
-const userDiscordId = user?.discordId;
-
+    const userDiscordId =
+      (req as any)?.user?.discordId ? String((req as any).user.discordId).trim() : null;
 
     const updatedParties = await Promise.all(
-  parties.map(async (party) => {
-    if (!party.isClosed && (now.getTime() - new Date(party.createdAt).getTime()) > 2 * 60 * 60 * 1000) {
-      await Party.findByIdAndUpdate(party._id, { isClosed: true });
-      party.isClosed = true;
-    }
+      parties.map(async (party: any) => {
+        // 2시간 자동 마감
+        const createdMs = party.createdAt ? new Date(party.createdAt).getTime() : 0;
+        if (!party.isClosed && createdMs && now - createdMs > 2 * 60 * 60 * 1000) {
+          await Party.findByIdAndUpdate(party._id, { isClosed: true });
+          party.isClosed = true;
+        }
 
-    const isApplied =
-      party.applicants?.some(
-        (a: any) =>
-          String(a.discordId).trim() === String(userDiscordId).trim()
-      ) || false;
+        // ✅ 로그인한 경우에만 isApplied 계산
+        const isApplied =
+          !!userDiscordId &&
+          Array.isArray(party.applicants) &&
+          party.applicants.some(
+            (a: any) => String(a?.discordId || "").trim() === userDiscordId
+          );
 
-
-    return {
-      ...party,
-      isApplied,
-    };
-  })
-);
-
+        return { ...party, isApplied };
+      })
+    );
 
     res.json(updatedParties);
   } catch (err) {
@@ -50,33 +51,6 @@ const userDiscordId = user?.discordId;
   }
 });
 
-// 파티 모집글 등록
-router.post("/", authMiddleware, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { map, subMap, positions, content } = req.body;
-    const userId = req.user?.id;
-
-    if (!map || !subMap || !positions || !content || !userId) {
-      return res.status(400).json({ message: "필수 항목 누락 또는 인증 안됨" });
-    }
-
-    const newParty = new Party({ userId, map, subMap, positions, content });
-    await newParty.save();
-    res.status(201).json(newParty);
-  } catch (err) {
-    res.status(500).json({ message: "서버 오류" });
-  }
-});
-
-// 모집글 삭제
-router.delete("/:id", async (req, res) => {
-  try {
-    await Party.findByIdAndDelete(req.params.id);
-    res.json({ message: "삭제 완료" });
-  } catch (err) {
-    res.status(500).json({ message: "서버 오류" });
-  }
-});
 
 // 파티 신청
 router.post("/:id/apply", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -137,5 +111,21 @@ router.patch("/:id/close", async (req, res) => {
 
   res.send({ success: true });
 });
+
+// ✅ 파티 상세 조회
+router.get("/:id", async (req, res) => {
+  try {
+    const party = await Party.findById(req.params.id).lean();
+    if (!party) {
+      return res.status(404).json({ message: "파티를 찾을 수 없습니다." });
+    }
+
+    res.json(party);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "서버 오류" });
+  }
+});
+
 
 export default router;
